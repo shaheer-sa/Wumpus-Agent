@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wumpus Logic Agent</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --panel: #0f1626;
+    --border: #1e3a5f;
+    --safe: #00ff88;
+    --danger: #ff3355;
+    --unknown: #2a3a55;
+    --visited: #1a2a3a;
+    --text: #c8deff;
+    --accent: #00c8ff;
+    --warn: #ffaa00;
+    --gold: #ffd700;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    padding: 20px;
+    background-image: 
+      radial-gradient(ellipse at 20% 20%, rgba(0,200,255,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(0,255,136,0.03) 0%, transparent 50%);
+  }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    color: var(--accent);
+    font-size: 1.6rem;
+    text-align: center;
+    letter-spacing: 4px;
+    margin-bottom: 4px;
+    text-shadow: 0 0 20px rgba(0,200,255,0.5);
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #5a7a9a;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+  }
+
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 16px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+
+  /* CONFIG */
+  .config-row {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .config-row label { font-size: 0.75rem; color: #7a9ab8; }
+  .config-row input[type=number] {
+    width: 60px; background: #0a1525; border: 1px solid var(--border);
+    color: var(--text); font-family: 'Share Tech Mono'; font-size: 0.85rem;
+    padding: 4px 8px; border-radius: 2px;
+  }
+
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover { background: #00aadd; box-shadow: 0 0 12px rgba(0,200,255,0.4); }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .btn-secondary:hover { background: rgba(0,200,255,0.1); }
+
+  .btn-warn {
+    background: var(--warn);
+    color: #000;
+  }
+  .btn-warn:hover { background: #dd9900; }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* GRID */
+  #grid-container {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+  }
+
+  #grid {
+    display: grid;
+    gap: 2px;
+  }
+
+  .cell {
+    width: 70px; height: 70px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    background: var(--unknown);
+    user-select: none;
+  }
+
+  .cell:hover { border-color: var(--accent); }
+
+  .cell.visited { background: var(--visited); border-color: #2a4a6a; }
+  .cell.safe { background: rgba(0,255,136,0.12); border-color: var(--safe); }
+  .cell.danger { background: rgba(255,51,85,0.15); border-color: var(--danger); }
+  .cell.agent { background: rgba(0,200,255,0.15); border-color: var(--accent); }
+  .cell.start { background: rgba(0,200,255,0.08); }
+
+  .cell-icon { font-size: 1.4rem; line-height: 1; }
+  .cell-label { font-size: 0.5rem; color: #5a7a9a; margin-top: 2px; letter-spacing: 1px; }
+  .cell-percepts { font-size: 0.45rem; color: var(--warn); margin-top: 1px; }
+  .cell-coord { position: absolute; top: 2px; left: 3px; font-size: 0.4rem; color: #3a5a7a; }
+
+  /* LEGEND */
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.65rem; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; border: 1px solid; }
+
+  /* SIDEBAR */
+  .sidebar { display: flex; flex-direction: column; gap: 12px; }
+
+  /* METRICS */
+  .metric { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #1a2a3a; }
+  .metric:last-child { border-bottom: none; }
+  .metric-label { font-size: 0.65rem; color: #5a7a9a; }
+  .metric-value { font-family: 'Orbitron', monospace; font-size: 0.9rem; color: var(--accent); }
+
+  /* PERCEPTS */
+  .percept-list { font-size: 0.7rem; line-height: 2; }
+  .percept-item { padding: 3px 8px; border-left: 2px solid var(--accent); margin-bottom: 4px; background: rgba(0,200,255,0.05); }
+  .percept-none { color: #3a5a7a; font-size: 0.7rem; }
+
+  /* KB LOG */
+  #kb-log {
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 0.62rem;
+    line-height: 1.8;
+  }
+  #kb-log::-webkit-scrollbar { width: 4px; }
+  #kb-log::-webkit-scrollbar-track { background: #0a1020; }
+  #kb-log::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .log-entry { color: #4a7a9a; padding: 1px 0; }
+  .log-entry.new { color: var(--accent); }
+  .log-entry.resolve { color: var(--safe); }
+  .log-entry.contradict { color: var(--danger); }
+
+  /* INFERENCE LOG */
+  #inf-log {
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 0.62rem;
+    line-height: 1.8;
+  }
+  #inf-log::-webkit-scrollbar { width: 4px; }
+  #inf-log::-webkit-scrollbar-track { background: #0a1020; }
+  #inf-log::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .inf-entry { padding: 1px 0; }
+  .inf-safe { color: var(--safe); }
+  .inf-danger { color: var(--danger); }
+  .inf-step { color: #5a8aaa; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .status-bar {
+    text-align: center;
+    font-size: 0.7rem;
+    padding: 6px;
+    border-radius: 2px;
+    margin-top: 6px;
+  }
+  .status-playing { background: rgba(0,200,255,0.1); color: var(--accent); border: 1px solid var(--border); }
+  .status-win { background: rgba(0,255,136,0.15); color: var(--safe); border: 1px solid var(--safe); }
+  .status-dead { background: rgba(255,51,85,0.15); color: var(--danger); border: 1px solid var(--danger); }
+
+  .hint { font-size: 0.62rem; color: #3a5a7a; margin-top: 6px; }
+
+  @media (max-width: 750px) {
+    .main-layout { grid-template-columns: 1fr; }
+    .cell { width: 55px; height: 55px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>WUMPUS LOGIC AGENT</h1>
+<div class="subtitle">KNOWLEDGE-BASED PROPOSITIONAL INFERENCE ENGINE</div>
+
+<div class="main-layout">
+  <!-- LEFT: Grid + Controls -->
+  <div>
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-title">⚙ ENVIRONMENT CONFIG</div>
+      <div class="config-row">
+        <label>ROWS</label>
+        <input type="number" id="inp-rows" value="4" min="3" max="6">
+        <label>COLS</label>
+        <input type="number" id="inp-cols" value="4" min="3" max="6">
+        <label>PITS</label>
+        <input type="number" id="inp-pits" value="3" min="1" max="6">
+        <button class="btn btn-primary" onclick="initGame()">GENERATE WORLD</button>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(0,200,255,0.15);border-color:var(--accent)"></div>Agent</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(0,255,136,0.12);border-color:var(--safe)"></div>Safe</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(255,51,85,0.15);border-color:var(--danger)"></div>Pit/Wumpus</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--unknown);border-color:var(--border)"></div>Unknown</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--visited);border-color:#2a4a6a"></div>Visited</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">🗺 WUMPUS WORLD GRID</div>
+      <div id="grid-container"><div id="grid"></div></div>
+      <div id="status-bar" class="status-bar status-playing">AWAITING INITIALIZATION...</div>
+      <p class="hint">► Click an adjacent cell to move the agent. Agent starts at [1,1] (bottom-left).</p>
+      <div class="controls" style="margin-top:10px">
+        <button class="btn btn-secondary" id="btn-step" onclick="autoStep()" disabled>AUTO STEP</button>
+        <button class="btn btn-warn" onclick="revealAll()">REVEAL ALL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Sidebar -->
+  <div class="sidebar">
+    <!-- Metrics -->
+    <div class="panel">
+      <div class="panel-title">📊 REAL-TIME METRICS</div>
+      <div class="metric"><span class="metric-label">INFERENCE STEPS</span><span class="metric-value" id="m-steps">0</span></div>
+      <div class="metric"><span class="metric-label">CELLS VISITED</span><span class="metric-value" id="m-visited">0</span></div>
+      <div class="metric"><span class="metric-label">SAFE DEDUCED</span><span class="metric-value" id="m-safe">0</span></div>
+      <div class="metric"><span class="metric-label">DANGER DEDUCED</span><span class="metric-value" id="m-danger">0</span></div>
+      <div class="metric"><span class="metric-label">KB CLAUSES</span><span class="metric-value" id="m-clauses">0</span></div>
+    </div>
+
+    <!-- Current Percepts -->
+    <div class="panel">
+      <div class="panel-title">👁 CURRENT PERCEPTS</div>
+      <div id="percept-display"><p class="percept-none">No percepts yet.</p></div>
+    </div>
+
+    <!-- KB Log -->
+    <div class="panel">
+      <div class="panel-title">📋 KNOWLEDGE BASE LOG</div>
+      <div id="kb-log"><div class="log-entry">KB empty. Generate world to begin.</div></div>
+    </div>
+
+    <!-- Inference Log -->
+    <div class="panel">
+      <div class="panel-title">🔍 INFERENCE ENGINE LOG</div>
+      <div id="inf-log"><div class="inf-entry inf-step">Waiting for agent movement...</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let ROWS, COLS;
+let grid = [];         // 2D: {pit, wumpus, gold, breeze, stench}
+let agentR, agentC;
+let visited = new Set();
+let safeCells = new Set();
+let dangerCells = new Set();
+let KB = [];           // array of CNF clauses (arrays of strings)
+let inferenceSteps = 0;
+let gameOver = false;
+let revealed = false;
+
+const key = (r,c) => `${r},${c}`;
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function initGame() {
+  ROWS = parseInt(document.getElementById('inp-rows').value);
+  COLS = parseInt(document.getElementById('inp-cols').value);
+  let pits = parseInt(document.getElementById('inp-pits').value);
+  pits = Math.min(pits, ROWS*COLS - 3);
+
+  grid = [];
+  KB = [];
+  visited.clear();
+  safeCells.clear();
+  dangerCells.clear();
+  inferenceSteps = 0;
+  gameOver = false;
+  revealed = false;
+
+  // Init grid
+  for(let r=0;r<ROWS;r++){
+    grid[r]=[];
+    for(let c=0;c<COLS;c++) grid[r][c]={pit:false,wumpus:false,gold:false,breeze:false,stench:false};
+  }
+
+  // Place pits (not at start [ROWS-1][0])
+  let cells = [];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(!(r===ROWS-1&&c===0)) cells.push([r,c]);
+  shuffle(cells);
+  for(let i=0;i<pits;i++) grid[cells[i][0]][cells[i][1]].pit = true;
+
+  // Place wumpus (not at start, not on pit)
+  let wCells = cells.filter(([r,c])=>!grid[r][c].pit);
+  shuffle(wCells);
+  grid[wCells[0][0]][wCells[0][1]].wumpus = true;
+
+  // Place gold
+  let gCells = wCells.filter(([r,c])=>!(r===wCells[0][0]&&c===wCells[0][1]));
+  shuffle(gCells);
+  grid[gCells[0][0]][gCells[0][1]].gold = true;
+
+  // Compute percepts
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    getAdj(r,c).forEach(([ar,ac])=>{
+      if(grid[r][c].pit) grid[ar][ac].breeze = true;
+      if(grid[r][c].wumpus) grid[ar][ac].stench = true;
+    });
+  }
+
+  // Agent starts bottom-left = [ROWS-1, 0]
+  agentR = ROWS-1; agentC = 0;
+
+  clearLogs();
+  addKB(`INIT: Agent at [${ROWS-agentR},${agentC+1}]. World ${ROWS}×${COLS}.`, 'new');
+  addKB(`FACT: ¬P_1,1 (start is safe)`, 'new');
+  KB.push([`NEG_P_${agentR}_${agentC}`]); // start is safe
+  safeCells.add(key(agentR,agentC));
+
+  renderGrid();
+  enterCell(agentR, agentC);
+  document.getElementById('btn-step').disabled = false;
+  updateMetrics();
+}
+
+// ─── MOVEMENT ────────────────────────────────────────────────────────────────
+function clickCell(r,c) {
+  if(gameOver) return;
+  if(!isAdjacent(r,c,agentR,agentC)) { setStatus('⚠ Can only move to adjacent cells.','playing'); return; }
+  moveAgent(r,c);
+}
+
+function moveAgent(r,c) {
+  agentR=r; agentC=c;
+  enterCell(r,c);
+  renderGrid();
+  updateMetrics();
+}
+
+function enterCell(r,c) {
+  const cell = grid[r][c];
+  visited.add(key(r,c));
+  safeCells.add(key(r,c));
+
+  // Check death
+  if(cell.pit) { setStatus('💀 AGENT FELL INTO A PIT! GAME OVER.','dead'); gameOver=true; revealAll(); return; }
+  if(cell.wumpus) { setStatus('💀 AGENT EATEN BY WUMPUS! GAME OVER.','dead'); gameOver=true; revealAll(); return; }
+  if(cell.gold) setStatus('🏆 GOLD FOUND! MISSION COMPLETE!','win');
+
+  // TELL KB
+  const disp = `[${ROWS-r},${c+1}]`;
+  addKB(`VISIT ${disp}: `, 'new');
+  if(cell.breeze){ addKB(`  TELL: B_${ROWS-r},${c+1} (Breeze detected)`, 'new'); KB.push([`B_${r}_${c}`]); }
+  else { addKB(`  TELL: ¬B_${ROWS-r},${c+1} (No breeze)`, 'new'); KB.push([`NEG_B_${r}_${c}`]); }
+  if(cell.stench){ addKB(`  TELL: S_${ROWS-r},${c+1} (Stench detected)`, 'new'); KB.push([`S_${r}_${c}`]); }
+  else { addKB(`  TELL: ¬S_${ROWS-r},${c+1} (No stench)`, 'new'); KB.push([`NEG_S_${r}_${c}`]); }
+
+  // Add biconditional clauses for pit inference
+  const adj = getAdj(r,c);
+  if(!cell.breeze){
+    // No breeze -> no pit in any adjacent cell
+    adj.forEach(([ar,ac])=>{
+      if(!visited.has(key(ar,ac))){
+        KB.push([`NEG_P_${ar}_${ac}`]);
+        safeCells.add(key(ar,ac));
+        addKB(`  INFER: ¬P_${ROWS-ar},${ac+1} (no breeze → safe)`, 'resolve');
+      }
+    });
+  } else {
+    // Breeze -> at least one adjacent is pit: add disjunctive clause
+    const clause = adj.map(([ar,ac])=>`P_${ar}_${ac}`);
+    KB.push(clause);
+    addKB(`  TELL: ${clause.map(l=>`P_${l.split('_')[1]},${l.split('_')[2]}`).join('∨')} (breeze → pit nearby)`, 'new');
+  }
+
+  if(!cell.stench){
+    adj.forEach(([ar,ac])=>{
+      if(!visited.has(key(ar,ac))){
+        KB.push([`NEG_W_${ar}_${ac}`]);
+        addKB(`  INFER: ¬W_${ROWS-ar},${ac+1} (no stench → no wumpus)`, 'resolve');
+      }
+    });
+  }
+
+  // Run resolution on unvisited neighbors
+  runInference();
+  renderPercepts(r,c);
+  if(!gameOver) setStatus(`Agent at [${ROWS-r},${c+1}]. Exploring...`, 'playing');
+}
+
+// ─── RESOLUTION REFUTATION ───────────────────────────────────────────────────
+function runInference() {
+  // For each unvisited adjacent cell, try to prove it safe (¬P ∧ ¬W) or dangerous
+  getAdj(agentR,agentC).forEach(([r,c])=>{
+    if(visited.has(key(r,c))) return;
+    const cellKey = key(r,c);
+
+    // Try proving ¬P (no pit) via resolution
+    let pitSafe = resolutionRefutation(`P_${r}_${c}`);
+    let wumpSafe = resolutionRefutation(`W_${r}_${c}`);
+
+    if(pitSafe && wumpSafe){
+      safeCells.add(cellKey);
+      addInf(`✓ SAFE DEDUCED: [${ROWS-r},${c+1}] — ¬P ∧ ¬W proved via resolution`, 'inf-safe');
+    } else {
+      // Try proving dangerous (P or W)
+      let pitDanger = resolutionRefutation(`NEG_P_${r}_${c}`);
+      let wDanger = resolutionRefutation(`NEG_W_${r}_${c}`);
+      if(pitDanger || wDanger){
+        dangerCells.add(cellKey);
+        addInf(`✗ DANGER DEDUCED: [${ROWS-r},${c+1}] — pit/wumpus likely`, 'inf-danger');
+      } else {
+        addInf(`? UNKNOWN: [${ROWS-r},${c+1}] — insufficient info`, 'inf-step');
+      }
+    }
+  });
+}
+
+function resolutionRefutation(goalLiteral) {
+  // Add negation of goal to KB, try to derive contradiction
+  // Returns true if contradiction found 
+  inferenceSteps++;
+  addInf(`  Resolution: proving ¬${goalLiteral}... (step ${inferenceSteps})`, 'inf-step');
+
+  let clauses = KB.map(c=>[...c]);
+  clauses.push([goalLiteral]); // negate: if proving ¬P, add P to find contradiction
+
+  // Simple unit-propagation resolution
+  let changed = true;
+  let iterations = 0;
+  while(changed && iterations < 50){
+    changed = false; iterations++;
+    const units = clauses.filter(c=>c.length===1).map(c=>c[0]);
+    for(let u of units){
+      const neg = negate(u);
+      // Remove clauses containing u (satisfied)
+      const before = clauses.length;
+      clauses = clauses.filter(c=>!c.includes(u));
+      if(clauses.length < before) changed = true;
+      // Shorten clauses containing neg
+      for(let cl of clauses){
+        const idx = cl.indexOf(neg);
+        if(idx!==-1){ cl.splice(idx,1); changed=true; }
+      }
+      // Empty clause = contradiction
+      if(clauses.some(c=>c.length===0)){
+        addInf(`  ⊥ CONTRADICTION found in ${iterations} steps!`, 'inf-safe');
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function negate(lit){
+  return lit.startsWith('NEG_') ? lit.slice(4) : 'NEG_'+lit;
+}
+
+// ─── AUTO STEP ───────────────────────────────────────────────────────────────
+function autoStep(){
+  if(gameOver) return;
+  // Find safe unvisited adjacent cell
+  const adj = getAdj(agentR,agentC);
+  let target = adj.find(([r,c])=>safeCells.has(key(r,c))&&!visited.has(key(r,c)));
+  if(!target){
+    // Find any unvisited adjacent that's not marked danger
+    target = adj.find(([r,c])=>!visited.has(key(r,c))&&!dangerCells.has(key(r,c)));
+  }
+  if(!target){
+    // Backtrack to any visited adjacent
+    target = adj.find(([r,c])=>visited.has(key(r,c)));
+  }
+  if(target) moveAgent(target[0],target[1]);
+  else setStatus('No moves available.','playing');
+}
+
+// ─── REVEAL ──────────────────────────────────────────────────────────────────
+function revealAll(){
+  revealed = true;
+  renderGrid();
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function renderGrid(){
+  const g = document.getElementById('grid');
+  g.style.gridTemplateColumns = `repeat(${COLS}, 70px)`;
+  g.innerHTML='';
+
+  // Render top row first 
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const cell = grid[r][c];
+      const k = key(r,c);
+      const isAgent = (r===agentR&&c===agentC);
+      const isVisited = visited.has(k);
+      const isSafe = safeCells.has(k)&&!isVisited&&!isAgent;
+      const isDanger = dangerCells.has(k)&&!isVisited&&!isAgent;
+
+      let cls = 'cell';
+      if(isAgent) cls+=' agent';
+      else if(isVisited) cls+=' visited';
+      else if(isSafe) cls+=' safe';
+      else if(isDanger) cls+=' danger';
+
+      let icon = '';
+      let label = '';
+      let percStr = '';
+
+      if(isAgent){ icon='🤖'; label='AGENT'; }
+      else if(revealed || isVisited){
+        if(cell.pit){ icon='🕳'; label='PIT'; cls+=' danger'; }
+        else if(cell.wumpus){ icon='👾'; label='WUMPUS'; cls+=' danger'; }
+        else if(cell.gold){ icon='💰'; label='GOLD'; }
+        else { icon=isVisited?'✓':''; label=isVisited?'SAFE':''; }
+        if(revealed&&!isVisited&&!cell.pit&&!cell.wumpus) icon='·';
+      } else {
+        if(isSafe){ icon='✓'; label='SAFE'; }
+        else if(isDanger){ icon='⚠'; label='DANGER'; }
+        else { icon='?'; }
+      }
+
+      // Show percepts on visited cells
+      if(isVisited){
+        let p=[];
+        if(cell.breeze) p.push('💨');
+        if(cell.stench) p.push('💀');
+        if(cell.gold) p.push('💰');
+        percStr = p.join('');
+      }
+
+      const div = document.createElement('div');
+      div.className = cls;
+      div.onclick = ()=>clickCell(r,c);
+      div.innerHTML = `
+        <span class="cell-coord">${ROWS-r},${c+1}</span>
+        <span class="cell-icon">${icon}</span>
+        <span class="cell-label">${label}</span>
+        <span class="cell-percepts">${percStr}</span>`;
+      g.appendChild(div);
+    }
+  }
+}
+
+function renderPercepts(r,c){
+  const cell = grid[r][c];
+  const div = document.getElementById('percept-display');
+  let html = '';
+  if(cell.breeze) html+=`<div class="percept-item">💨 BREEZE at [${ROWS-r},${c+1}]</div>`;
+  if(cell.stench) html+=`<div class="percept-item">💀 STENCH at [${ROWS-r},${c+1}]</div>`;
+  if(cell.gold)   html+=`<div class="percept-item">✨ GLITTER at [${ROWS-r},${c+1}]</div>`;
+  if(!cell.breeze&&!cell.stench&&!cell.gold) html=`<p class="percept-none">No percepts at [${ROWS-r},${c+1}].</p>`;
+  div.innerHTML = html;
+}
+
+function updateMetrics(){
+  document.getElementById('m-steps').textContent = inferenceSteps;
+  document.getElementById('m-visited').textContent = visited.size;
+  document.getElementById('m-safe').textContent = [...safeCells].filter(k=>!visited.has(k)).length;
+  document.getElementById('m-danger').textContent = dangerCells.size;
+  document.getElementById('m-clauses').textContent = KB.length;
+}
+
+function setStatus(msg, type){
+  const el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = 'status-bar status-'+type;
+}
+
+// ─── LOGS ────────────────────────────────────────────────────────────────────
+function addKB(msg, cls=''){
+  const log = document.getElementById('kb-log');
+  const d = document.createElement('div');
+  d.className = 'log-entry '+cls;
+  d.textContent = msg;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addInf(msg, cls=''){
+  const log = document.getElementById('inf-log');
+  const d = document.createElement('div');
+  d.className = 'inf-entry '+cls;
+  d.textContent = msg;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearLogs(){
+  document.getElementById('kb-log').innerHTML='';
+  document.getElementById('inf-log').innerHTML='';
+  document.getElementById('percept-display').innerHTML='<p class="percept-none">No percepts yet.</p>';
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function getAdj(r,c){
+  return [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].filter(([ar,ac])=>ar>=0&&ar<ROWS&&ac>=0&&ac<COLS);
+}
+
+function isAdjacent(r1,c1,r2,c2){
+  return (Math.abs(r1-r2)+Math.abs(c1-c2))===1;
+}
+
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+}
+
+// Auto-init on load
+window.onload = ()=> initGame();
+</script>
+</body>
+</html>
